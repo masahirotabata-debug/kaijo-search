@@ -1,22 +1,46 @@
 """
 Playwright を別プロセスで実行するワーカースクリプト。
 JSONファイルパスを引数で受け取り、結果をJSONファイルに書き出す。
+認証情報は環境変数から読み込む。
 """
 
 import asyncio
 import json
+import os
 import sys
 import re
 from datetime import date, timedelta
 from playwright.async_api import async_playwright
 
-CREDENTIALS = {
-    "場所とる": {"url": "https://bashotoru.com/", "id": "ba1@agent-network.com", "pw": "Agent0416T"},
-    "スペースラボ": {"url": "https://spacelab-system.jp/", "id": "shun.sato@agent-network.com", "pw": "Agent0401"},
-    "楽市": {"url": "https://rakuichi-space.com/login", "id": "shun.sato@agent-network.com", "pw": "Fz8sWeuB"},
-    "自由市場": {"url": "https://www.jiyu18.jp/mypage/members/login", "id": "ba2@agent-network.com", "pw": "agent0416"},
-    "ダイエースペース": {"url": "https://web-space.daiei-spacecreate.com/", "id": "300118", "pw": "Passw0rd"},
-}
+def get_credentials():
+    """環境変数から認証情報を取得する。"""
+    return {
+        "場所とる": {
+            "url": "https://bashotoru.com/",
+            "id": os.environ.get("BASHOTORU_ID", ""),
+            "pw": os.environ.get("BASHOTORU_PW", ""),
+        },
+        "スペースラボ": {
+            "url": "https://spacelab-system.jp/",
+            "id": os.environ.get("SPACELAB_ID", ""),
+            "pw": os.environ.get("SPACELAB_PW", ""),
+        },
+        "楽市": {
+            "url": "https://rakuichi-space.com/login",
+            "id": os.environ.get("RAKUICHI_ID", ""),
+            "pw": os.environ.get("RAKUICHI_PW", ""),
+        },
+        "自由市場": {
+            "url": "https://www.jiyu18.jp/mypage/members/login",
+            "id": os.environ.get("JIYU_ID", ""),
+            "pw": os.environ.get("JIYU_PW", ""),
+        },
+        "ダイエースペース": {
+            "url": "https://web-space.daiei-spacecreate.com/",
+            "id": os.environ.get("DAIEI_ID", ""),
+            "pw": os.environ.get("DAIEI_PW", ""),
+        },
+    }
 
 SITE_KEYWORD_MAP = {
     "場所とる": ["場所とる", "場所取る"],
@@ -90,7 +114,8 @@ async def scan_calendar(page, start_date_str, end_date_str):
 
 async def check_site(page, site_name, facility_name, venue_name, start_date_str, end_date_str):
     try:
-        creds = CREDENTIALS[site_name]
+        credentials = get_credentials()
+        creds = credentials[site_name]
         await page.goto(creds["url"], timeout=30000)
         await page.wait_for_load_state("networkidle", timeout=30000)
 
