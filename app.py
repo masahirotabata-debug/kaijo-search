@@ -1,7 +1,6 @@
 import subprocess
 import sys
 subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=False)
-subprocess.run([sys.executable, "-m", "playwright", "install-deps", "chromium"], check=False)
 
 
 """
