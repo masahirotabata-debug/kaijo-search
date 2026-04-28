@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(python -c ' *)",
+      "Bash(where python *)",
+      "Bash(where python3 *)",
+      "Bash(where py *)",
+      "PowerShell(python --version)",
+      "PowerShell(py --version)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\masahirotabata\\\\AppData\\\\Local\\\\\" -Directory | Where-Object { $_.Name -match \"python|conda|uv|pyenv\" } | Select-Object FullName)",
+      "PowerShell($env:PATH -split \";\" | Where-Object { $_ -ne \"\" } | Sort-Object)",
+      "PowerShell(winget list --name Python 2>&1)",
+      "PowerShell(winget search Python.Python 2>&1)"
+    ]
+  }
+}
