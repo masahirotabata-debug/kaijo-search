@@ -1,3 +1,9 @@
+import subprocess
+import sys
+subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=False)
+subprocess.run([sys.executable, "-m", "playwright", "install-deps", "chromium"], check=False)
+
+
 """
 催事場所検索ツール - STEP1: 住所×半径検索 / STEP2: 発注先別分類 / STEP3: 空き確認
 """
