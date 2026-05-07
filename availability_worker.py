@@ -121,21 +121,33 @@ async def login_daiei(page, creds):
         await page.wait_for_timeout(1000)
     except Exception:
         pass
-    # ログインメニューをクリックしてフォームを表示
+    # ログインメニューをクリックしてフォームを表示（ナビの「ログイン」li要素）
     try:
-        await page.click('li:has-text("ログイン"), a:has-text("ログイン")', timeout=10000)
+        login_nav = page.locator('li').filter(has_text="ログイン").first
+        await login_nav.click(timeout=10000)
         await page.wait_for_timeout(2000)
     except Exception:
         pass
     # IDとパスワードを入力
-    inputs = page.locator('input[type="text"], input[type="number"]')
-    count = await inputs.count()
-    if count >= 1:
-        await inputs.nth(0).fill(creds["id"])
+    try:
+        # まずinput[type="text"]でID入力を試みる
+        id_input = page.locator('input[type="text"]').first
+        await id_input.wait_for(timeout=10000)
+        await id_input.fill(creds["id"])
+    except Exception:
+        # なければinput全体の最初
+        inputs = page.locator('input:not([type="hidden"])')
+        if await inputs.count() > 0:
+            await inputs.nth(0).fill(creds["id"])
     pw_inputs = page.locator('input[type="password"]')
     if await pw_inputs.count() > 0:
         await pw_inputs.first.fill(creds["pw"])
-    await page.click('button:has-text("ログイン"), input[type="submit"], a:has-text("ログインする")', timeout=10000)
+    # ログインボタンをクリック（「ログインする >」というテキスト）
+    try:
+        await page.click('a:has-text("ログインする"), button:has-text("ログインする"), input[type="submit"]', timeout=10000)
+    except Exception:
+        # フォームをEnterで送信
+        await page.keyboard.press("Enter")
     await page.wait_for_load_state("networkidle", timeout=60000)
 
 
