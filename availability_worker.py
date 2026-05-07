@@ -178,6 +178,20 @@ async def login_spacelab(page, creds):
     await page.wait_for_load_state("networkidle", timeout=60000)
 
 
+async def login_jiyu(page, creds):
+    """自由市場 ログイン処理"""
+    await page.goto(creds["url"], timeout=60000)
+    await page.wait_for_load_state("networkidle", timeout=60000)
+    # メールアドレス入力（type="email" or type="text"）
+    id_sel = 'input[type="email"], input[name="email"], input[name="login_id"]'
+    pw_sel = 'input[type="password"]'
+    await page.wait_for_selector(id_sel, timeout=30000)
+    await page.fill(id_sel, creds["id"])
+    await page.fill(pw_sel, creds["pw"])
+    await page.click('input[type="submit"], button[type="submit"], button:has-text("ログイン")')
+    await page.wait_for_load_state("networkidle", timeout=60000)
+
+
 async def login_generic(page, creds):
     """汎用ログイン処理"""
     await page.goto(creds["url"], timeout=60000)
@@ -203,6 +217,8 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
             await login_spacelab(page, creds)
         elif site_name == "ダイエースペース":
             await login_daiei(page, creds)
+        elif site_name == "自由市場":
+            await login_jiyu(page, creds)
         else:
             await login_generic(page, creds)
 
@@ -224,7 +240,10 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
         if await link.count() == 0:
             link = page.locator(f'a:has-text("{facility_name}")').first
         if await link.count() == 0:
-            return "会場が見つかりません"
+            # デバッグ：現在のURLとページタイトルを返す
+            current_url = page.url
+            title = await page.title()
+            return f"会場が見つかりません（URL:{current_url[:60]} / タイトル:{title[:30]}）"
         await link.click()
         await page.wait_for_load_state("networkidle", timeout=45000)
         return await scan_calendar(page, start_date_str, end_date_str)
