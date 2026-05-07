@@ -182,13 +182,23 @@ async def login_jiyu(page, creds):
     """自由市場 ログイン処理"""
     await page.goto(creds["url"], timeout=60000)
     await page.wait_for_load_state("networkidle", timeout=60000)
-    # メールアドレス入力（type="email" or type="text"）
-    id_sel = 'input[type="email"], input[name="email"], input[name="login_id"]'
-    pw_sel = 'input[type="password"]'
-    await page.wait_for_selector(id_sel, timeout=30000)
-    await page.fill(id_sel, creds["id"])
-    await page.fill(pw_sel, creds["pw"])
-    await page.click('input[type="submit"], button[type="submit"], button:has-text("ログイン")')
+    # inputを順番で取得（1番目がメールアドレス、2番目がパスワード）
+    inputs = page.locator('input:not([type="hidden"]):not([type="checkbox"])')
+    await page.wait_for_timeout(2000)
+    count = await inputs.count()
+    if count >= 2:
+        await inputs.nth(0).fill(creds["id"])
+        await inputs.nth(1).fill(creds["pw"])
+    elif count == 1:
+        await inputs.nth(0).fill(creds["id"])
+        pw_input = page.locator('input[type="password"]')
+        if await pw_input.count() > 0:
+            await pw_input.fill(creds["pw"])
+    # ログインボタンをクリック
+    try:
+        await page.click('input[type="submit"], button[type="submit"], button:has-text("ログイン")', timeout=10000)
+    except Exception:
+        await page.keyboard.press("Enter")
     await page.wait_for_load_state("networkidle", timeout=60000)
 
 
