@@ -116,25 +116,25 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
     try:
         credentials = get_credentials()
         creds = credentials[site_name]
-        await page.goto(creds["url"], timeout=30000)
-        await page.wait_for_load_state("networkidle", timeout=30000)
+        await page.goto(creds["url"], timeout=60000)
+        await page.wait_for_load_state("networkidle", timeout=60000)
 
         if site_name == "ダイエースペース":
             id_sel = 'input[name="id"], input[name="user_id"], input[name="login_id"], input[type="text"]:first-of-type'
         else:
             id_sel = 'input[type="email"], input[name="email"], input[name="username"], input[name="login_id"]'
 
-        await page.wait_for_selector(id_sel, timeout=10000)
+        await page.wait_for_selector(id_sel, timeout=30000)
         await page.fill(id_sel, creds["id"])
         await page.fill('input[type="password"]', creds["pw"])
         await page.click('button[type="submit"], input[type="submit"]')
-        await page.wait_for_load_state("networkidle", timeout=30000)
+        await page.wait_for_load_state("networkidle", timeout=60000)
 
         search_sel = 'input[type="search"], input[name*="keyword"], input[placeholder*="検索"]'
         if await page.locator(search_sel).count() > 0:
             await page.locator(search_sel).first.fill(venue_name)
             await page.keyboard.press("Enter")
-            await page.wait_for_load_state("networkidle", timeout=20000)
+            await page.wait_for_load_state("networkidle", timeout=45000)
 
         link = page.locator(f'a:has-text("{venue_name}")').first
         if await link.count() == 0:
@@ -142,7 +142,7 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
         if await link.count() == 0:
             return "会場が見つかりません"
         await link.click()
-        await page.wait_for_load_state("networkidle", timeout=20000)
+        await page.wait_for_load_state("networkidle", timeout=45000)
         return await scan_calendar(page, start_date_str, end_date_str)
     except Exception as e:
         return f"確認エラー: {str(e)[:80]}"
