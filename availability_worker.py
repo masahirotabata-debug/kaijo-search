@@ -162,7 +162,7 @@ async def main():
     results = []
 
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True)
+        browser = await pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
         try:
             for venue in venues:
                 vendor = str(venue.get("発注先", "") or "")
