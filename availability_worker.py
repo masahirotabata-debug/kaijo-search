@@ -111,6 +111,34 @@ async def scan_calendar(page, start_date_str, end_date_str):
     return "空きあり"
 
 
+async def login_daiei(page, creds):
+    """ダイエースペース ログイン処理"""
+    await page.goto(creds["url"], timeout=60000)
+    await page.wait_for_load_state("networkidle", timeout=60000)
+    # クッキー同意ボタンがあれば閉じる
+    try:
+        await page.click('button:has-text("同意する")', timeout=5000)
+        await page.wait_for_timeout(1000)
+    except Exception:
+        pass
+    # ログインメニューをクリックしてフォームを表示
+    try:
+        await page.click('li:has-text("ログイン"), a:has-text("ログイン")', timeout=10000)
+        await page.wait_for_timeout(2000)
+    except Exception:
+        pass
+    # IDとパスワードを入力
+    inputs = page.locator('input[type="text"], input[type="number"]')
+    count = await inputs.count()
+    if count >= 1:
+        await inputs.nth(0).fill(creds["id"])
+    pw_inputs = page.locator('input[type="password"]')
+    if await pw_inputs.count() > 0:
+        await pw_inputs.first.fill(creds["pw"])
+    await page.click('button:has-text("ログイン"), input[type="submit"], a:has-text("ログインする")', timeout=10000)
+    await page.wait_for_load_state("networkidle", timeout=60000)
+
+
 async def login_bashotoru(page, creds):
     """場所とる ログイン処理"""
     await page.goto(creds["url"], timeout=60000)
@@ -129,7 +157,6 @@ async def login_spacelab(page, creds):
     """スペースラボ ログイン処理"""
     await page.goto(creds["url"], timeout=60000)
     await page.wait_for_load_state("networkidle", timeout=60000)
-    # ログインID と パスワード
     id_sel = 'input[name="login_id"], input[name="email"], input[name="id"], input[type="text"]'
     pw_sel = 'input[type="password"]'
     await page.wait_for_selector(id_sel, timeout=30000)
@@ -162,10 +189,12 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
             await login_bashotoru(page, creds)
         elif site_name == "スペースラボ":
             await login_spacelab(page, creds)
+        elif site_name == "ダイエースペース":
+            await login_daiei(page, creds)
         else:
             await login_generic(page, creds)
 
-        # スペースラボは施設名でURLを直接構築できる
+        # スペースラボは施設名でURLを直接構築
         if site_name == "スペースラボ":
             search_url = f"https://spacelab-system.jp/search/?facility_word={venue_name}"
             await page.goto(search_url, timeout=60000)
