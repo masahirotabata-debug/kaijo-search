@@ -74,7 +74,7 @@ def classify_vendor(vendor):
     return supported, has_unsupported
 
 
-async def scan_calendar(page, start_date_str, end_date_str):
+async def scan_calendar(page, start_date_str, end_date_str, site_name=""):
     date_texts = set()
     current = date.fromisoformat(start_date_str)
     end = date.fromisoformat(end_date_str)
@@ -85,25 +85,27 @@ async def scan_calendar(page, start_date_str, end_date_str):
         current += timedelta(days=1)
 
     content = await page.content()
-    booked_selectors = [
-        ".booked", ".reserved", ".full", ".unavailable",
-        "[class*='booked']", "[class*='reserved']", "[class*='full']",
-        "td.booked", "td.reserved", "td.full",
-    ]
-    for sel in booked_selectors:
-        try:
-            elements = page.locator(sel)
-            count = await elements.count()
-            for i in range(count):
-                elem = elements.nth(i)
-                text = (await elem.text_content() or "").strip()
-                aria = await elem.get_attribute("aria-label") or ""
-                data_date = await elem.get_attribute("data-date") or ""
-                for d_str in date_texts:
-                    if d_str and (d_str in text or d_str in aria or d_str in data_date):
-                        return "予約済み（空きあり）"
-        except Exception:
-            pass
+    # 自由市場はCSSセレクタ判定をスキップ（誤検知のため）
+    if site_name != "自由市場":
+        booked_selectors = [
+            ".booked", ".reserved", ".full", ".unavailable",
+            "[class*='booked']", "[class*='reserved']", "[class*='full']",
+            "td.booked", "td.reserved", "td.full",
+        ]
+        for sel in booked_selectors:
+            try:
+                elements = page.locator(sel)
+                count = await elements.count()
+                for i in range(count):
+                    elem = elements.nth(i)
+                    text = (await elem.text_content() or "").strip()
+                    aria = await elem.get_attribute("aria-label") or ""
+                    data_date = await elem.get_attribute("data-date") or ""
+                    for d_str in date_texts:
+                        if d_str and (d_str in text or d_str in aria or d_str in data_date):
+                            return "予約済み（空きあり）"
+            except Exception:
+                pass
 
     hit_words = []
     for word in ["予約不可", "受付不可", "FULL", "空きなし", "満室", "貸出不可"]:
@@ -259,7 +261,7 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
             return f"会場が見つかりません（URL:{current_url[:60]} / タイトル:{title[:30]}）"
         await link.click()
         await page.wait_for_load_state("networkidle", timeout=45000)
-        return await scan_calendar(page, start_date_str, end_date_str)
+        return await scan_calendar(page, start_date_str, end_date_str, site_name)
     except Exception as e:
         return f"確認エラー: {str(e)[:120]}"
 
