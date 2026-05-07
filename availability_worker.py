@@ -130,7 +130,7 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
         await page.click('button[type="submit"], input[type="submit"]')
         await page.wait_for_load_state("networkidle", timeout=60000)
 
-        search_sel = 'input[type="search"], input[name*="keyword"], input[placeholder*="検索"]'
+        search_sel = 'input[placeholder*="検索"], input[type="search"], input[name*="keyword"], input[placeholder*="施設名"]'
         if await page.locator(search_sel).count() > 0:
             await page.locator(search_sel).first.fill(venue_name)
             await page.keyboard.press("Enter")
