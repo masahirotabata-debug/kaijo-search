@@ -105,7 +105,7 @@ async def scan_calendar(page, start_date_str, end_date_str):
         except Exception:
             pass
 
-    for word in ["満", "貸", "予約不可", "受付不可", "FULL"]:
+    for word in ["予約不可", "受付不可", "FULL", "空きなし", "満室", "貸出不可"]:
         if word in content:
             return "予約済み（詳細確認推奨）"
     return "空きあり"
