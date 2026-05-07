@@ -261,6 +261,15 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
             return f"会場が見つかりません（URL:{current_url[:60]} / タイトル:{title[:30]}）"
         await link.click()
         await page.wait_for_load_state("networkidle", timeout=45000)
+        # デバッグ：自由市場の場合はページ情報を返す
+        if site_name == "自由市場":
+            current_url = page.url
+            title = await page.title()
+            page_content = await page.content()
+            # ページ内の予約関連ワードを全て確認
+            debug_words = ["予約不可", "受付不可", "FULL", "空きなし", "満室", "貸出不可", "booked", "reserved", "full", "unavailable"]
+            found = [w for w in debug_words if w in page_content]
+            return f"DEBUG URL:{current_url[:50]} ヒット:{found}"
         return await scan_calendar(page, start_date_str, end_date_str, site_name)
     except Exception as e:
         return f"確認エラー: {str(e)[:120]}"
