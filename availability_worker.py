@@ -187,9 +187,9 @@ async def login_jiyu(page, creds):
     """自由市場 ログイン処理"""
     await page.goto(creds["url"], timeout=60000)
     await page.wait_for_load_state("networkidle", timeout=60000)
+    await page.wait_for_timeout(2000)
     # inputを順番で取得（1番目がメールアドレス、2番目がパスワード）
     inputs = page.locator('input:not([type="hidden"]):not([type="checkbox"])')
-    await page.wait_for_timeout(2000)
     count = await inputs.count()
     if count >= 2:
         await inputs.nth(0).fill(creds["id"])
@@ -205,6 +205,7 @@ async def login_jiyu(page, creds):
     except Exception:
         await page.keyboard.press("Enter")
     await page.wait_for_load_state("networkidle", timeout=60000)
+    await page.wait_for_timeout(2000)
 
 
 async def login_generic(page, creds):
@@ -244,9 +245,12 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
             await page.wait_for_load_state("networkidle", timeout=45000)
         elif site_name == "自由市場":
             from urllib.parse import quote
-            search_url = f"https://www.jiyu18.jp/products/result?keyword={quote(facility_name)}"
+            # ログイン後に直接検索URLへ移動
+            kw = facility_name if facility_name and facility_name != "nan" else venue_name
+            search_url = f"https://www.jiyu18.jp/products/result?keyword={quote(kw)}"
             await page.goto(search_url, timeout=60000)
             await page.wait_for_load_state("networkidle", timeout=45000)
+            await page.wait_for_timeout(2000)
         else:
             # 検索フォームがあれば使う（なければスキップ）
             search_sel = 'input[placeholder*="施設名"], input[placeholder*="検索"], input[type="search"], input[name*="keyword"]'
