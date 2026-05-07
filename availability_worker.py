@@ -185,24 +185,30 @@ async def login_spacelab(page, creds):
 
 async def login_jiyu(page, creds):
     """自由市場 ログイン処理"""
-    await page.goto(creds["url"], timeout=60000)
+    await page.goto("https://www.jiyu18.jp/mypage/members/login", timeout=60000)
     await page.wait_for_load_state("networkidle", timeout=60000)
-    await page.wait_for_timeout(2000)
-    # inputを順番で取得（1番目がメールアドレス、2番目がパスワード）
-    inputs = page.locator('input:not([type="hidden"]):not([type="checkbox"])')
-    count = await inputs.count()
-    if count >= 2:
-        await inputs.nth(0).fill(creds["id"])
-        await inputs.nth(1).fill(creds["pw"])
-    elif count == 1:
-        await inputs.nth(0).fill(creds["id"])
-        pw_input = page.locator('input[type="password"]')
-        if await pw_input.count() > 0:
-            await pw_input.fill(creds["pw"])
-    # ログインボタンをクリック
-    try:
-        await page.click('input[type="submit"], button[type="submit"], button:has-text("ログイン")', timeout=10000)
-    except Exception:
+    await page.wait_for_timeout(3000)
+    # フォームのinputを全取得してデバッグ
+    all_inputs = page.locator('input')
+    total = await all_inputs.count()
+    # hidden/checkboxを除いたinputを取得
+    visible_inputs = []
+    for i in range(total):
+        inp = all_inputs.nth(i)
+        itype = await inp.get_attribute("type") or "text"
+        if itype not in ["hidden", "checkbox", "radio", "submit", "button"]:
+            visible_inputs.append(inp)
+    # 1番目にID、2番目にパスワードを入力
+    if len(visible_inputs) >= 2:
+        await visible_inputs[0].fill(creds["id"])
+        await visible_inputs[1].fill(creds["pw"])
+    elif len(visible_inputs) == 1:
+        await visible_inputs[0].fill(creds["id"])
+    # submitボタンを探してクリック
+    submit = page.locator('input[type="submit"]')
+    if await submit.count() > 0:
+        await submit.first.click()
+    else:
         await page.keyboard.press("Enter")
     await page.wait_for_load_state("networkidle", timeout=60000)
     await page.wait_for_timeout(2000)
@@ -275,10 +281,12 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
             current_url = page.url
             title = await page.title()
             page_content = await page.content()
-            # ページ内の予約関連ワードを全て確認
             debug_words = ["予約不可", "受付不可", "FULL", "空きなし", "満室", "貸出不可", "booked", "reserved", "full", "unavailable"]
             found = [w for w in debug_words if w in page_content]
-            return f"DEBUG URL:{current_url[:50]} ヒット:{found}"
+            # リンク数も確認
+            link_count = await page.locator(f'a:has-text("{venue_name}")').count()
+            fac_count = await page.locator(f'a:has-text("{facility_name}")').count()
+            return f"DEBUG URL:{current_url[:60]} ヒット:{found} 会場リンク数:{link_count} 施設リンク数:{fac_count}"
         return await scan_calendar(page, start_date_str, end_date_str, site_name)
     except Exception as e:
         return f"確認エラー: {str(e)[:120]}"
