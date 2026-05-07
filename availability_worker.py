@@ -237,9 +237,14 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
         else:
             await login_generic(page, creds)
 
-        # スペースラボは施設名でURLを直接構築
+        # サイトごとに検索URLを直接構築
         if site_name == "スペースラボ":
             search_url = f"https://spacelab-system.jp/search/?facility_word={venue_name}"
+            await page.goto(search_url, timeout=60000)
+            await page.wait_for_load_state("networkidle", timeout=45000)
+        elif site_name == "自由市場":
+            from urllib.parse import quote
+            search_url = f"https://www.jiyu18.jp/products/result?keyword={quote(facility_name)}"
             await page.goto(search_url, timeout=60000)
             await page.wait_for_load_state("networkidle", timeout=45000)
         else:
