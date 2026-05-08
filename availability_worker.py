@@ -281,14 +281,25 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
         # デバッグ：自由市場の場合はページ情報を返す
         if site_name == "自由市場":
             current_url = page.url
-            title = await page.title()
             page_content = await page.content()
-            debug_words = ["予約不可", "受付不可", "FULL", "空きなし", "満室", "貸出不可", "booked", "reserved", "full", "unavailable"]
+            debug_words = ["予約不可", "受付不可", "FULL", "空きなし", "満室", "貸出不可"]
             found = [w for w in debug_words if w in page_content]
-            # リンク数も確認
-            link_count = await page.locator(f'a:has-text("{venue_name}")').count()
-            fac_count = await page.locator(f'a:has-text("{facility_name}")').count()
-            return f"DEBUG URL:{current_url[:60]} ヒット:{found} 会場リンク数:{link_count} 施設リンク数:{fac_count}"
+            # 施設リンクのテキストを最大5件取得
+            fac_links = page.locator(f'a:has-text("{facility_name}")')
+            fac_texts = []
+            for i in range(min(await fac_links.count(), 5)):
+                t = await fac_links.nth(i).text_content()
+                fac_texts.append((t or "")[:20])
+            # 全リンクのhrefを最大10件取得
+            all_links = page.locator("a")
+            hrefs = []
+            for i in range(min(await all_links.count(), 200)):
+                h = await all_links.nth(i).get_attribute("href") or ""
+                if "jiyu18" in h or h.startswith("/"):
+                    hrefs.append(h[:40])
+                if len(hrefs) >= 10:
+                    break
+            return f"DEBUG URL:{current_url[:50]} ヒット:{found} 施設テキスト:{fac_texts} リンク例:{hrefs[:5]}"
         return await scan_calendar(page, start_date_str, end_date_str, site_name)
     except Exception as e:
         return f"確認エラー: {str(e)[:120]}"
