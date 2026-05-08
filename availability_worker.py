@@ -250,13 +250,15 @@ async def check_site(page, site_name, facility_name, venue_name, start_date_str,
             await page.goto(search_url, timeout=60000)
             await page.wait_for_load_state("networkidle", timeout=45000)
         elif site_name == "自由市場":
-            from urllib.parse import quote
-            # ログイン後に直接検索URLへ移動
+            # 自由市場はログイン後のトップページでそのまま検索
+            # 検索フォームに施設名を入力
             kw = facility_name if facility_name and facility_name != "nan" else venue_name
-            search_url = f"https://www.jiyu18.jp/products/result?keyword={quote(kw)}"
-            await page.goto(search_url, timeout=60000)
-            await page.wait_for_load_state("networkidle", timeout=45000)
-            await page.wait_for_timeout(2000)
+            search_input = page.locator('input[name="keyword"], input[placeholder*="検索"], input[type="search"], input[placeholder*="施設"]')
+            if await search_input.count() > 0:
+                await search_input.first.fill(kw)
+                await page.keyboard.press("Enter")
+                await page.wait_for_load_state("networkidle", timeout=45000)
+                await page.wait_for_timeout(2000)
         else:
             # 検索フォームがあれば使う（なければスキップ）
             search_sel = 'input[placeholder*="施設名"], input[placeholder*="検索"], input[type="search"], input[name*="keyword"]'
