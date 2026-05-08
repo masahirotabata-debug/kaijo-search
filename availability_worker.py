@@ -1,22 +1,45 @@
 """
 Playwright を別プロセスで実行するワーカースクリプト。
-コマンドライン引数でJSONを受け取り、結果をJSONで標準出力に返す。
+JSONファイルパスを引数で受け取り、結果をJSONファイルに書き出す。
+認証情報は環境変数から読み込む。
 """
 
 import asyncio
 import json
+import os
 import sys
 import re
 from datetime import date, timedelta
 from playwright.async_api import async_playwright
 
-CREDENTIALS = {
-    "場所とる": {"url": "https://bashotoru.com/", "id": "ba1@agent-network.com", "pw": "Agent0416T"},
-    "スペースラボ": {"url": "https://spacelab-system.jp/", "id": "shun.sato@agent-network.com", "pw": "Agent0401"},
-    "楽市": {"url": "https://rakuichi-space.com/login", "id": "shun.sato@agent-network.com", "pw": "Fz8sWeuB"},
-    "自由市場": {"url": "https://www.jiyu18.jp/mypage/members/login", "id": "ba2@agent-network.com", "pw": "agent0416"},
-    "ダイエースペース": {"url": "https://web-space.daiei-spacecreate.com/", "id": "300118", "pw": "Passw0rd"},
-}
+def get_credentials():
+    return {
+        "場所とる": {
+            "url": "https://bashotoru.com/login",
+            "id": os.environ.get("BASHOTORU_ID", ""),
+            "pw": os.environ.get("BASHOTORU_PW", ""),
+        },
+        "スペースラボ": {
+            "url": "https://spacelab-system.jp/login/",
+            "id": os.environ.get("SPACELAB_ID", ""),
+            "pw": os.environ.get("SPACELAB_PW", ""),
+        },
+        "楽市": {
+            "url": "https://rakuichi-space.com/login",
+            "id": os.environ.get("RAKUICHI_ID", ""),
+            "pw": os.environ.get("RAKUICHI_PW", ""),
+        },
+        "自由市場": {
+            "url": "https://www.jiyu18.jp/mypage/members/login",
+            "id": os.environ.get("JIYU_ID", ""),
+            "pw": os.environ.get("JIYU_PW", ""),
+        },
+        "ダイエースペース": {
+            "url": "https://web-space.daiei-spacecreate.com/",
+            "id": os.environ.get("DAIEI_ID", ""),
+            "pw": os.environ.get("DAIEI_PW", ""),
+        },
+    }
 
 SITE_KEYWORD_MAP = {
     "場所とる": ["場所とる", "場所取る"],
@@ -26,13 +49,13 @@ SITE_KEYWORD_MAP = {
     "ダイエースペース": ["ダイエースペース"],
 }
 
-MANUAL_KEYWORDS = ["グラスト", "グラスと", "アイフィールド", "ライフ", "ネクサスイノベーション"]
+MANUAL_KEYWORDS = ["グラスト", "グラスと", "アイフィールド", "ライト", "ネクサスイノーション"]
 
 
 def classify_vendor(vendor):
     if not vendor or str(vendor).strip() in ["", "nan"]:
         return [], False
-    parts = [p.strip() for p in re.split(r"[／/]", str(vendor)) if p.strip()]
+    parts = [p.strip() for p in re.split(r"[・／]", str(vendor)) if p.strip()]
     supported = []
     has_unsupported = False
     for part in parts:
@@ -51,10 +74,10 @@ def classify_vendor(vendor):
     return supported, has_unsupported
 
 
-async def scan_calendar(page, start_date, end_date):
+async def scan_calendar(page, start_date_str, end_date_str):
     date_texts = set()
-    current = date.fromisoformat(start_date)
-    end = date.fromisoformat(end_date)
+    current = date.fromisoformat(start_date_str)
+    end = date.fromisoformat(end_date_str)
     while current <= end:
         date_texts.add(current.strftime("%Y-%m-%d"))
         date_texts.add(f"{current.month}/{current.day}")
@@ -78,53 +101,107 @@ async def scan_calendar(page, start_date, end_date):
                 data_date = await elem.get_attribute("data-date") or ""
                 for d_str in date_texts:
                     if d_str and (d_str in text or d_str in aria or d_str in data_date):
-                        return "予約済みあり"
+                        return "予約済み（空きあり）"
         except Exception:
             pass
 
-    for word in ["×", "満", "予約不可", "受付不可", "FULL"]:
+    for word in ["満", "貸", "予約不可", "受付不可", "FULL"]:
         if word in content:
-            return "予約済みあり（要詳細確認）"
+            return "予約済み（詳細確認推奨）"
     return "空きあり"
 
 
-async def check_site(page, site_name, facility_name, venue_name, start_date, end_date):
+
+async def login_bashotoru(page, creds):
+    """場所とる ログイン処理"""
+    await page.goto(creds["url"], timeout=60000)
+    await page.wait_for_load_state("networkidle", timeout=60000)
+    # 場所とるはSPA、inputを順番で取得
+    inputs = page.locator('input')
+    count = await inputs.count()
+    if count >= 2:
+        await inputs.nth(0).fill(creds["id"])
+        await inputs.nth(1).fill(creds["pw"])
+    await page.click('button[type="submit"], button:has-text("ログイン")')
+    await page.wait_for_load_state("networkidle", timeout=60000)
+
+
+async def login_spacelab(page, creds):
+    """スペースラボ ログイン処理"""
+    await page.goto(creds["url"], timeout=60000)
+    await page.wait_for_load_state("networkidle", timeout=60000)
+    # ログインID と パスワード
+    id_sel = 'input[name="login_id"], input[name="email"], input[name="id"], input[type="text"]'
+    pw_sel = 'input[type="password"]'
+    await page.wait_for_selector(id_sel, timeout=30000)
+    await page.fill(id_sel, creds["id"])
+    await page.fill(pw_sel, creds["pw"])
     try:
-        creds = CREDENTIALS[site_name]
-        await page.goto(creds["url"], timeout=30000)
-        await page.wait_for_load_state("networkidle", timeout=30000)
+        await page.click('input[type="submit"], button[type="submit"], button:has-text("ログイン")', timeout=10000)
+    except Exception:
+        await page.keyboard.press("Enter")
+    await page.wait_for_load_state("networkidle", timeout=60000)
 
-        if site_name == "ダイエースペース":
-            id_sel = 'input[name="id"], input[name="user_id"], input[name="login_id"], input[type="text"]:first-of-type'
+
+async def login_generic(page, creds):
+    """汎用ログイン処理"""
+    await page.goto(creds["url"], timeout=60000)
+    await page.wait_for_load_state("networkidle", timeout=60000)
+    id_sel = 'input[type="email"], input[name="email"], input[name="username"], input[name="login_id"], input[name="id"], input[type="text"]'
+    pw_sel = 'input[type="password"]'
+    await page.wait_for_selector(id_sel, timeout=30000)
+    await page.fill(id_sel, creds["id"])
+    await page.fill(pw_sel, creds["pw"])
+    await page.click('button[type="submit"], input[type="submit"]')
+    await page.wait_for_load_state("networkidle", timeout=60000)
+
+
+async def check_site(page, site_name, facility_name, venue_name, start_date_str, end_date_str):
+    try:
+        credentials = get_credentials()
+        creds = credentials[site_name]
+
+        # サイトごとにログイン処理を分岐
+        if site_name == "場所とる":
+            await login_bashotoru(page, creds)
+        elif site_name == "スペースラボ":
+            await login_spacelab(page, creds)
         else:
-            id_sel = 'input[type="email"], input[name="email"], input[name="username"], input[name="login_id"]'
+            await login_generic(page, creds)
 
-        await page.wait_for_selector(id_sel, timeout=10000)
-        await page.fill(id_sel, creds["id"])
-        await page.fill('input[type="password"]', creds["pw"])
-        await page.click('button[type="submit"], input[type="submit"]')
-        await page.wait_for_load_state("networkidle", timeout=30000)
+        # スペースラボは施設名でURLを直接構築できる
+        if site_name == "スペースラボ":
+            search_url = f"https://spacelab-system.jp/search/?facility_word={venue_name}"
+            await page.goto(search_url, timeout=60000)
+            await page.wait_for_load_state("networkidle", timeout=45000)
+        else:
+            # 検索フォームがあれば使う（なければスキップ）
+            search_sel = 'input[placeholder*="施設名"], input[placeholder*="検索"], input[type="search"], input[name*="keyword"]'
+            if await page.locator(search_sel).count() > 0:
+                await page.locator(search_sel).first.fill(venue_name)
+                await page.keyboard.press("Enter")
+                await page.wait_for_load_state("networkidle", timeout=45000)
 
-        search_sel = 'input[type="search"], input[name*="keyword"], input[placeholder*="検索"]'
-        if await page.locator(search_sel).count() > 0:
-            await page.locator(search_sel).first.fill(venue_name)
-            await page.keyboard.press("Enter")
-            await page.wait_for_load_state("networkidle", timeout=20000)
-
+        # 会場リンクを探してクリック
         link = page.locator(f'a:has-text("{venue_name}")').first
         if await link.count() == 0:
             link = page.locator(f'a:has-text("{facility_name}")').first
         if await link.count() == 0:
             return "会場が見つかりません"
         await link.click()
-        await page.wait_for_load_state("networkidle", timeout=20000)
-        return await scan_calendar(page, start_date, end_date)
+        await page.wait_for_load_state("networkidle", timeout=45000)
+        return await scan_calendar(page, start_date_str, end_date_str)
     except Exception as e:
-        return f"確認エラー: {str(e)[:80]}"
+        return f"確認エラー: {str(e)[:120]}"
 
 
 async def main():
-    data = json.loads(sys.argv[1])
+    input_path = sys.argv[1]
+    output_path = sys.argv[2]
+
+    with open(input_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
     venues = data["venues"]
     start_date = data["start_date"]
     end_date = data["end_date"]
@@ -132,12 +209,12 @@ async def main():
     results = []
 
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True)
+        browser = await pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
         try:
             for venue in venues:
                 vendor = str(venue.get("発注先", "") or "")
                 facility_name = str(venue.get("施設名", "") or "")
-                venue_name = str(venue.get("実施場所名", "") or "")
+                venue_name = str(venue.get("催事場所名", "") or "")
                 supported_sites, has_unsupported = classify_vendor(vendor)
 
                 venue_copy = dict(venue)
@@ -162,20 +239,16 @@ async def main():
 
                 venue_copy["確認サイト"] = "、".join(supported_sites)
                 if has_unsupported:
-                    venue_copy["確認サイト"] += "（＋手動確認要）"
+                    venue_copy["確認サイト"] += "（要手動確認あり）"
                 venue_copy["確認結果"] = "、".join(site_results)
                 venue_copy["要手動確認"] = has_unsupported
-
-                if any("予約済み" in r for r in site_results):
-                    venue_copy["_excluded"] = True
-                else:
-                    venue_copy["_excluded"] = False
-
+                venue_copy["_excluded"] = any("予約済み" in r for r in site_results)
                 results.append(venue_copy)
         finally:
             await browser.close()
 
-    print(json.dumps(results, ensure_ascii=False))
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False)
 
 
 if __name__ == "__main__":
