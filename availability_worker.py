@@ -184,34 +184,36 @@ async def login_spacelab(page, creds):
 
 
 async def login_jiyu(page, creds):
-    """自由市場 ログイン処理"""
+    """自由市場 ログイン処理 - JavaScriptフォーム対応"""
     await page.goto("https://www.jiyu18.jp/mypage/members/login", timeout=60000)
     await page.wait_for_load_state("networkidle", timeout=60000)
-    await page.wait_for_timeout(3000)
-    # フォームのinputを全取得してデバッグ
-    all_inputs = page.locator('input')
-    total = await all_inputs.count()
-    # hidden/checkboxを除いたinputを取得
-    visible_inputs = []
-    for i in range(total):
-        inp = all_inputs.nth(i)
-        itype = await inp.get_attribute("type") or "text"
-        if itype not in ["hidden", "checkbox", "radio", "submit", "button"]:
-            visible_inputs.append(inp)
-    # 1番目にID、2番目にパスワードを入力
-    if len(visible_inputs) >= 2:
-        await visible_inputs[0].fill(creds["id"])
-        await visible_inputs[1].fill(creds["pw"])
-    elif len(visible_inputs) == 1:
-        await visible_inputs[0].fill(creds["id"])
-    # submitボタンを探してクリック
-    submit = page.locator('input[type="submit"]')
+    await page.wait_for_timeout(5000)
+    # JavaScriptでフォームに直接値をセット
+    await page.evaluate(f"""
+        const inputs = document.querySelectorAll('input');
+        const visible = Array.from(inputs).filter(i =>
+            !['hidden','checkbox','radio','submit','button'].includes(i.type)
+        );
+        if (visible.length >= 1) {{
+            visible[0].value = '{creds["id"]}';
+            visible[0].dispatchEvent(new Event('input', {{bubbles: true}}));
+            visible[0].dispatchEvent(new Event('change', {{bubbles: true}}));
+        }}
+        if (visible.length >= 2) {{
+            visible[1].value = '{creds["pw"]}';
+            visible[1].dispatchEvent(new Event('input', {{bubbles: true}}));
+            visible[1].dispatchEvent(new Event('change', {{bubbles: true}}));
+        }}
+    """)
+    await page.wait_for_timeout(1000)
+    # submitボタンをクリック
+    submit = page.locator('input[type="submit"], button[type="submit"]')
     if await submit.count() > 0:
         await submit.first.click()
     else:
         await page.keyboard.press("Enter")
     await page.wait_for_load_state("networkidle", timeout=60000)
-    await page.wait_for_timeout(2000)
+    await page.wait_for_timeout(3000)
 
 
 async def login_generic(page, creds):
